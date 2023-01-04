@@ -7,6 +7,7 @@ import org.eclipse.rdf4j.sparqlbuilder.core.query.SelectQuery;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 
 public interface Searchable extends RepositoryBehaviour {
@@ -15,14 +16,13 @@ public interface Searchable extends RepositoryBehaviour {
         return this.query(all.getQueryString(), authentication, requiredAuthority);
     }
 
-    default Flux<BindingSet> modify(ModifyQuery all, Authentication authentication, GrantedAuthority requiredAuthority) {
-        return this.modify(all.getQueryString(), authentication, requiredAuthority);
-    }
-
     Flux<BindingSet> query(String queryString, Authentication authentication, GrantedAuthority requiredAuthority);
 
-    Flux<BindingSet> modify(String queryString, Authentication authentication, GrantedAuthority requiredAuthority);
-
+    //TODO delete this
+    default Mono<Void> modify(ModifyQuery all, Authentication authentication, GrantedAuthority requiredAuthority) {
+        return this.modify(all.getQueryString(), authentication, requiredAuthority);
+    }
+    Mono<Void> modify(String queryString, Authentication authentication, GrantedAuthority requiredAuthority);
 
     Flux<NamespaceAwareStatement> construct(String query, Authentication authentication, GrantedAuthority requiredAuthority);
 }

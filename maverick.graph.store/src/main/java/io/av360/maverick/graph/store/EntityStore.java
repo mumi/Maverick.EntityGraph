@@ -7,6 +7,7 @@ import io.av360.maverick.graph.store.rdf.models.Entity;
 import io.av360.maverick.graph.store.rdf.models.Transaction;
 import org.eclipse.rdf4j.model.*;
 import org.eclipse.rdf4j.query.BindingSet;
+import org.eclipse.rdf4j.sparqlbuilder.core.query.ModifyQuery;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import reactor.core.publisher.Flux;
@@ -31,7 +32,6 @@ public interface EntityStore extends Searchable, Resettable, ModelUpdates, Selec
      * @return Returns the transaction statements
      */
     Mono<Transaction> insert(Model model, Transaction transaction);
-
 
     default Flux<BindingSet> query(String query, Authentication authentication) {
         return this.query(query, authentication, Authorities.READER);
@@ -61,6 +61,5 @@ public interface EntityStore extends Searchable, Resettable, ModelUpdates, Selec
     default Flux<Transaction> commit(List<Transaction> transactions, Authentication authentication) {
         return this.commit(transactions, authentication, Authorities.READER);
     }
-
 
 }

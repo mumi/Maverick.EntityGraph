@@ -10,10 +10,9 @@ import io.av360.maverick.graph.feature.applications.store.ApplicationsStore;
 import io.av360.maverick.graph.model.errors.DuplicateRecordsException;
 import io.av360.maverick.graph.model.rdf.GeneratedIdentifier;
 import io.av360.maverick.graph.model.security.Authorities;
-import io.av360.maverick.graph.services.services.QueryServices;
+
 import io.av360.maverick.graph.store.rdf.helpers.BindingsAccessor;
 import io.av360.maverick.graph.model.vocabulary.Local;
-import io.av360.maverick.graph.store.rdf.helpers.BindingsAccessor;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.util.ModelBuilder;
@@ -30,17 +29,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import io.av360.maverick.graph.api.security.errors.RevokedApiKeyUsed;
-import io.av360.maverick.graph.api.security.errors.UnknownApiKey;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
 
 import java.net.URI;
-import java.text.SimpleDateFormat;
 import java.time.ZonedDateTime;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 
@@ -317,11 +313,11 @@ public class ApplicationsService {
     }
 
 
-    public Mono<Void> setApplicationConfig(String applicationIdentifier, String s3Host, String s3Bucket, String exportFrequency, Authentication authentication) {
+    public Mono<Void> setApplicationConfig(String applicationIdentifier, String s3Host, String s3BucketId, String exportFrequency, Authentication authentication) {
 
         Variable node = SparqlBuilder.var("n");
         Variable s3HostVar = SparqlBuilder.var("d");
-        Variable s3BucketVar = SparqlBuilder.var("e");
+        Variable s3BucketIdVar = SparqlBuilder.var("e");
         Variable exportFrequencyVar = SparqlBuilder.var("f");
 
         ModifyQuery q = Queries.MODIFY()
@@ -329,10 +325,10 @@ public class ApplicationsService {
                         .andHas(Application.HAS_KEY, applicationIdentifier)
                 )
                 .delete(node.has(Application.HAS_S3_HOST, s3HostVar))
-                .delete(node.has(Application.HAS_S3_BUCKET_ID, s3BucketVar))
+                .delete(node.has(Application.HAS_S3_BUCKET_ID, s3BucketIdVar))
                 .delete(node.has(Application.HAS_EXPORT_FREQUENCY, exportFrequencyVar))
                 .insert(node.has(Application.HAS_S3_HOST, s3Host))
-                .insert(node.has(Application.HAS_S3_BUCKET_ID, s3Bucket))
+                .insert(node.has(Application.HAS_S3_BUCKET_ID, s3BucketId))
                 .insert(node.has(Application.HAS_EXPORT_FREQUENCY, exportFrequency));
 
         return this.applicationsStore.modify(q, authentication, Authorities.APPLICATION)
@@ -347,7 +343,7 @@ public class ApplicationsService {
         Variable label = SparqlBuilder.var("b");
         Variable persistent = SparqlBuilder.var("c");
         Variable s3Host = SparqlBuilder.var("d");
-        Variable s3Bucket = SparqlBuilder.var("e");
+        Variable s3BucketId = SparqlBuilder.var("e");
         Variable exportFrequency = SparqlBuilder.var("f");
 
         SelectQuery q = Queries.SELECT()
@@ -356,7 +352,7 @@ public class ApplicationsService {
                         .andHas(Application.HAS_LABEL, label)
                         .andHas(Application.IS_PERSISTENT, persistent)
                         .andHas(Application.HAS_S3_HOST, s3Host)
-                        .andHas(Application.HAS_S3_BUCKET_ID, s3Bucket)
+                        .andHas(Application.HAS_S3_BUCKET_ID, s3BucketId)
                         .andHas(Application.HAS_EXPORT_FREQUENCY, exportFrequency)
                 )
                 .limit(1);
@@ -370,7 +366,7 @@ public class ApplicationsService {
                     map.put("label", ba.asString(label));
                     map.put("persistent", ba.asString(persistent));
                     map.put("s3Host", ba.asString(s3Host));
-                    map.put("s3Bucket", ba.asString(s3Bucket));
+                    map.put("s3BucketId", ba.asString(s3BucketId));
                     map.put("exportFrequency", ba.asString(exportFrequency));
                     return map;
                 })
@@ -383,7 +379,7 @@ public class ApplicationsService {
         Variable label = SparqlBuilder.var("b");
         Variable persistent = SparqlBuilder.var("c");
         Variable s3Host = SparqlBuilder.var("d");
-        Variable s3Bucket = SparqlBuilder.var("e");
+        Variable s3BucketId = SparqlBuilder.var("e");
 
         SelectQuery q = Queries.SELECT()
                 .where(node.isA(Application.TYPE)
@@ -391,7 +387,7 @@ public class ApplicationsService {
                         .andHas(Application.HAS_LABEL, label)
                         .andHas(Application.IS_PERSISTENT, persistent)
                         .andHas(Application.HAS_S3_HOST, s3Host)
-                        .andHas(Application.HAS_S3_BUCKET_ID, s3Bucket)
+                        .andHas(Application.HAS_S3_BUCKET_ID, s3BucketId)
                 )
                 .limit(1);
 
@@ -401,24 +397,28 @@ public class ApplicationsService {
                 .flatMap(this::getUniqueBindingSet)
                 .map(BindingsAccessor::new)
                 .map(ba -> {
-                    //TODO: fix this
-                    this.queryServices.queryGraph()
+
+                    //TODO: placeholder, should export the application
+                    String export = ba.asString(label);
+                    //this.queryServices.queryGraph();
 
                     try {
                         S3Client s3 = S3Client.builder()
+                                .forcePathStyle(true)
                                 .endpointOverride(URI.create(ba.asString(s3Host)))
+                                .region(Region.EU_WEST_1)
                                 .build();
                         PutObjectRequest objectRequest = PutObjectRequest.builder()
-                                .bucket(ba.asString(s3Bucket))
-                                .key(exportIdentifier)
+                                .bucket(ba.asString(s3BucketId))
+                                .key(applicationIdentifier)
                                 .build();
-                        s3.putObject(objectRequest, RequestBody.fromString(ba.asString(node)));
+                        s3.putObject(objectRequest, RequestBody.fromString(export));
 
                     } catch (S3Exception e) {
                         log.error(e.awsErrorDetails().errorMessage());
                     }
 
-                    return exportIdentifier;
+                    return applicationIdentifier;
                 })
                 .doOnSubscribe(sub -> log.debug("Exporting application with key '{}'", applicationIdentifier));
 
@@ -431,7 +431,7 @@ public class ApplicationsService {
         Variable label = SparqlBuilder.var("b");
         Variable persistent = SparqlBuilder.var("c");
         Variable s3Host = SparqlBuilder.var("d");
-        Variable s3Bucket = SparqlBuilder.var("e");
+        Variable s3BucketId = SparqlBuilder.var("e");
 
         SelectQuery q = Queries.SELECT()
                 .where(node.isA(Application.TYPE)
@@ -439,7 +439,7 @@ public class ApplicationsService {
                         .andHas(Application.HAS_LABEL, label)
                         .andHas(Application.IS_PERSISTENT, persistent)
                         .andHas(Application.HAS_S3_HOST, s3Host)
-                        .andHas(Application.HAS_S3_BUCKET_ID, s3Bucket)
+                        .andHas(Application.HAS_S3_BUCKET_ID, s3BucketId)
                 )
                 .limit(1);
 
@@ -447,30 +447,11 @@ public class ApplicationsService {
                 .collectList()
                 .flatMap(this::getUniqueBindingSet)
                 .map(BindingsAccessor::new)
-                .mapNotNull(ba -> {
-
-                    try {
-                        S3Client s3 = S3Client.builder()
-                                .endpointOverride(URI.create(ba.asString(s3Host)))
-                                .build();
-                        GetObjectRequest objectRequest = GetObjectRequest.builder()
-                                .bucket(ba.asString(s3Bucket))
-                                .key(exportId)
-                                .build();
-                        ResponseBytes<GetObjectResponse> objectBytes = s3.getObjectAsBytes(objectRequest);
-
-                        return objectBytes.asUtf8String();
-                    } catch (S3Exception e) {
-                        log.error(e.awsErrorDetails().errorMessage());
-                    }
-
-                    return null;
-                })
-                .map(responseBody -> {
+                .map(ba -> {
                     HashMap<String, String> response = new HashMap<>();
-                    response.put("application", applicationIdentifier);
-                    response.put("exportId", exportId);
-                    response.put("export", responseBody);
+                    response.put("s3Host", ba.asString(s3Host));
+                    response.put("s3BucketId", ba.asString(s3BucketId));
+                    response.put("s3ObjectId", applicationIdentifier);
                     return response;
                 })
                 .doOnSubscribe(sub -> log.debug("Getting export '{}' for application '{}'", exportId, applicationIdentifier));
