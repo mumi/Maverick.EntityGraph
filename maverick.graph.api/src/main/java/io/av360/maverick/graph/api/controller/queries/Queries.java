@@ -3,6 +3,8 @@ package io.av360.maverick.graph.api.controller.queries;
 import io.av360.maverick.graph.api.controller.AbstractController;
 import io.av360.maverick.graph.model.rdf.NamespaceAwareStatement;
 import io.av360.maverick.graph.services.QueryServices;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.rdf4j.query.BindingSet;
@@ -12,7 +14,6 @@ import reactor.core.publisher.Flux;
 
 @RestController
 @RequestMapping(path = "/api/query")
-//@Api(tags = "Queries")
 @Slf4j(topic = "graph.api.queries")
 @SecurityRequirement(name = "api_key")
 public class Queries extends AbstractController {
@@ -22,8 +23,14 @@ public class Queries extends AbstractController {
         this.queryServices = queryServices;
     }
 
-    //@ApiOperation(value = "Run a query")
     @PostMapping(value = "/select", consumes = "text/plain", produces = {"text/csv", "application/sparql-results+json"})
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            description = "Sparql Query",
+            content = @Content(examples = {
+                    @ExampleObject(name = "Select types", value = "SELECT ?entity  ?type WHERE { ?entity a ?type } LIMIT 100"),
+                    @ExampleObject(name = "Query everything", value = "SELECT ?a ?b ?c  ?type WHERE { ?a ?b ?c } LIMIT 100")
+            })
+    )
     @ResponseStatus(HttpStatus.ACCEPTED)
     Flux<BindingSet> queryBindings(@RequestBody String query) {
 
@@ -35,7 +42,6 @@ public class Queries extends AbstractController {
     }
 
 
-    //@ApiOperation(value = "Run a query")
     @PostMapping(value = "/construct", consumes = "text/plain", produces = {"text/turtle", "application/ld+json"})
     @ResponseStatus(HttpStatus.ACCEPTED)
     Flux<NamespaceAwareStatement> queryStatements(@RequestBody String query) {

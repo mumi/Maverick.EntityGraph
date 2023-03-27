@@ -1,5 +1,6 @@
 package io.av360.maverick.graph.api.security;
 
+import com.google.common.io.Files;
 import io.av360.maverick.graph.model.security.ApiKeyAuthenticationToken;
 import io.av360.maverick.graph.model.security.Authorities;
 import jakarta.annotation.PostConstruct;
@@ -7,15 +8,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.RandomStringGenerator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Set;
 
 @Component
@@ -45,11 +49,18 @@ public class DefaultAuthenticationManager implements ReactiveAuthenticationManag
     @Override
     public Mono<Authentication> authenticate(Authentication authentication) {
         Assert.notNull(authentication, "Authentication is null in Authentication Manager");
-        log.trace("(Filter) Handling authentication of type {} in system authentication manager (default)", authentication.getClass().getSimpleName());
+        log.trace("Handling authentication of type {} in system authentication manager (default)", authentication.getClass().getSimpleName());
 
         if (authentication instanceof TestingAuthenticationToken) {
             log.warn("Test authentication token detected, disabling security.");
             authentication.setAuthenticated(true);
+        }
+
+        if (authentication instanceof AnonymousAuthenticationToken) {
+            return handleAnonymousAuthentication(authentication)
+                    .map(auth -> (Authentication) auth);
+            //
+            //authentication.setAuthenticated(false);
         }
 
         if (authentication instanceof UsernamePasswordAuthenticationToken) {
@@ -65,6 +76,14 @@ public class DefaultAuthenticationManager implements ReactiveAuthenticationManag
 
 
         return Mono.just(authentication);
+    }
+
+    private Mono<? extends Authentication> handleAnonymousAuthentication(Authentication authentication) {
+        log.info("Handling request with missing authentication, granting read-only access.");
+
+        AnonymousAuthenticationToken auth = new AnonymousAuthenticationToken(authentication.getName(), authentication.getPrincipal(), List.of(Authorities.READER));
+        auth.setAuthenticated(true);
+        return Mono.just(auth);
     }
 
     private Mono<? extends Authentication> handleApiKeyAuthentication(ApiKeyAuthenticationToken authentication) {

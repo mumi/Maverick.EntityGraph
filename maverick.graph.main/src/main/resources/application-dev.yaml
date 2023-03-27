@@ -10,7 +10,7 @@ application:
       enabled: false
   features:
     modules:
-      applications: true
+      applications: false
       admin: true
     schedulers:
       detectDuplicates: false
@@ -40,5 +40,4 @@ logging:
     org:
       springframework:
         security: INFO
-    springfox: TRACE
 

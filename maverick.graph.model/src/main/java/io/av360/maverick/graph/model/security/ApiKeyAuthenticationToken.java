@@ -2,6 +2,7 @@ package io.av360.maverick.graph.model.security;
 
 import org.springframework.security.core.Authentication;
 
+import java.io.IOException;
 import java.util.*;
 
 /**
@@ -18,7 +19,12 @@ public class ApiKeyAuthenticationToken implements Authentication {
 
 
     public ApiKeyAuthenticationToken(Map<String, String> headers) {
-        this.headers = headers;
+
+
+        this.headers = new HashMap<>();
+        // headers are case insensitive according to RFC 2616
+        headers.forEach((key, val) -> this.headers.put(key.toUpperCase(), val));
+
         this.authorities = new HashSet<>(Authorities.NO_AUTHORITIES);
     }
 
@@ -32,7 +38,7 @@ public class ApiKeyAuthenticationToken implements Authentication {
     }
 
     public Optional<String> getApiKey() {
-        return Optional.of(this.getDetails().get(API_KEY_HEADER));
+        return Optional.ofNullable(Objects.requireNonNull(this.getDetails()).get(API_KEY_HEADER));
     }
 
     @Override
